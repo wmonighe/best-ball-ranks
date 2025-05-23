@@ -1,7 +1,10 @@
-const csvUrl = 'https://docs.google.com/spreadsheets/d/1rNouBdE-HbWafu-shO_5JLPSrLhr-xuGpXYfyOI-2oY/gviz/tq?tqx=out:csv&gid=148406078';
+// Rankings are loaded from the public Google Sheet using the gviz CSV export.
+// The sheet must be published to the web for this to succeed.
+const csvUrl =
+  'https://docs.google.com/spreadsheets/d/1rNouBdE-HbWafu-shO_5JLPSrLhr-xuGpXYfyOI-2oY/gviz/tq?tqx=out:csv&gid=148406078';
 
 /**
- * Fetch rankings from the public Google Sheet.
+ * Fetch rankings from the Google Sheet.
  * @returns {Promise<Array<Object>>}
  */
 async function fetchRankings() {
@@ -15,13 +18,12 @@ async function fetchRankings() {
 }
 
 /**
- * Fetch sentiment data from taeks.com.
+ * Fetch sentiment data from taeks.com. Falls back to an empty map on error.
  * @returns {Promise<Map<string,string>>}
  */
 async function fetchSentiment() {
-  const url = 'https://taeks.com/nfl/bestball/leaderboard/rookie';
   try {
-    const resp = await fetch(url);
+    const resp = await fetch('https://taeks.com/nfl/bestball/leaderboard/rookie');
     const html = await resp.text();
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -30,12 +32,12 @@ async function fetchSentiment() {
     if (table) {
       const rows = table.querySelectorAll('tr');
       if (rows.length > 0) {
-        const headers = Array.from(rows[0].querySelectorAll('th'));
-        const playerIdx = headers.findIndex((th) =>
-          th.textContent.trim().toLowerCase().includes('player')
+        const headerCells = Array.from(rows[0].querySelectorAll('th'));
+        const playerIdx = headerCells.findIndex((th) =>
+          th.textContent.trim().toLowerCase().includes('player'),
         );
-        const sentimentIdx = headers.findIndex((th) =>
-          th.textContent.trim().toLowerCase().includes('sentiment')
+        const sentimentIdx = headerCells.findIndex((th) =>
+          th.textContent.trim().toLowerCase().includes('sentiment'),
         );
         for (let i = 1; i < rows.length; i++) {
           const cells = rows[i].querySelectorAll('td');
@@ -46,8 +48,8 @@ async function fetchSentiment() {
             cells[sentimentIdx]
           ) {
             const name = cells[playerIdx].textContent.trim().toUpperCase();
-            const val = cells[sentimentIdx].textContent.trim();
-            map.set(name, val);
+            const sentiment = cells[sentimentIdx].textContent.trim();
+            map.set(name, sentiment);
           }
         }
       }
@@ -60,7 +62,7 @@ async function fetchSentiment() {
 }
 
 /**
- * Load data and populate the table.
+ * Load rankings and sentiment information, then populate the table.
  */
 async function loadData() {
   try {
@@ -80,8 +82,11 @@ function populateTable(rows, sentimentMap) {
   const table = document.getElementById('rankings-table');
   if (rows.length === 0) return;
 
-  const nameKey = Object.keys(rows[0]).find((k) => /player|name/i.test(k));
+  const nameKey = Object.keys(rows[0]).find((k) =>
+    /player|name/i.test(k),
+  );
 
+  // Build table header
   const headerRow = document.createElement('tr');
   Object.keys(rows[0]).forEach((key) => {
     const th = document.createElement('th');
@@ -93,6 +98,7 @@ function populateTable(rows, sentimentMap) {
   headerRow.appendChild(thSentiment);
   table.querySelector('thead').appendChild(headerRow);
 
+  // Build rows
   const tbody = table.querySelector('tbody');
   rows.forEach((row) => {
     const tr = document.createElement('tr');
@@ -101,10 +107,12 @@ function populateTable(rows, sentimentMap) {
       td.textContent = String(val).replace(/,/g, '');
       tr.appendChild(td);
     });
-    const tdSentiment = document.createElement("td");
-    const lookupName = nameKey ? row[nameKey].toUpperCase() : "";
-    tdSentiment.textContent = lookupName ? sentimentMap.get(lookupName) || "" : "";
+
+    const tdSentiment = document.createElement('td');
+    const name = nameKey ? row[nameKey].toUpperCase() : '';
+    tdSentiment.textContent = name ? sentimentMap.get(name) || '' : '';
     tr.appendChild(tdSentiment);
+
     tbody.appendChild(tr);
   });
 }
