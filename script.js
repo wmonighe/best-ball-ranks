@@ -3,16 +3,74 @@
 const csvUrl =
   'https://docs.google.com/spreadsheets/d/1rNouBdE-HbWafu-shO_5JLPSrLhr-xuGpXYfyOI-2oY/gviz/tq?tqx=out:csv&gid=148406078';
 
+/**
+ * Fetch rankings from the Google Sheet.
+ * @returns {Promise<Array<Object>>}
+ */
 async function fetchRankings() {
+  const response = await fetch(csvUrl);
+  const csvText = await response.text();
+  const results = Papa.parse(csvText, {
+    header: true,
+    skipEmptyLines: true,
+  });
+  return results.data;
+}
+
+/**
+ * Fetch sentiment data from taeks.com. Falls back to an empty map on error.
+ * @returns {Promise<Map<string,string>>}
+ */
+async function fetchSentiment() {
   try {
-    const response = await fetch(csvUrl);
-    const csvText = await response.text();
-    const results = Papa.parse(csvText, {
-      header: true,
-      skipEmptyLines: true,
-    });
-    const sentimentMap = await fetchSentiments();
-    populateTable(results.data, sentimentMap);
+    const resp = await fetch('https://taeks.com/nfl/bestball/leaderboard/rookie');
+    const html = await resp.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const table = doc.querySelector('table');
+    const map = new Map();
+    if (table) {
+      const rows = table.querySelectorAll('tr');
+      if (rows.length > 0) {
+        const headerCells = Array.from(rows[0].querySelectorAll('th'));
+        const playerIdx = headerCells.findIndex((th) =>
+          th.textContent.trim().toLowerCase().includes('player'),
+        );
+        const sentimentIdx = headerCells.findIndex((th) =>
+          th.textContent.trim().toLowerCase().includes('sentiment'),
+        );
+        for (let i = 1; i < rows.length; i++) {
+          const cells = rows[i].querySelectorAll('td');
+          if (
+            playerIdx >= 0 &&
+            sentimentIdx >= 0 &&
+            cells[playerIdx] &&
+            cells[sentimentIdx]
+          ) {
+            const name = cells[playerIdx].textContent.trim().toUpperCase();
+            const sentiment = cells[sentimentIdx].textContent.trim();
+            map.set(name, sentiment);
+          }
+        }
+      }
+    }
+    return map;
+  } catch (err) {
+    console.error('Unable to fetch sentiment data', err);
+    return new Map();
+  }
+}
+
+/**
+ * Load rankings and sentiment information, then populate the table.
+ */
+async function loadData() {
+  try {
+    const [rows, sentimentMap] = await Promise.all([
+      fetchRankings(),
+      fetchSentiment(),
+    ]);
+    populateTable(rows, sentimentMap);
   } catch (err) {
     const table = document.getElementById('rankings-table');
     table.innerHTML = '<caption>Unable to load rankings.</caption>';
@@ -20,80 +78,41 @@ async function fetchRankings() {
   }
 }
 
-async function fetchSentiments() {
-  const sentimentUrl =
-    'https://taeks.com/nfl/bestball/leaderboard/rookie';
-
-  try {
-    const response = await fetch(sentimentUrl);
-    const html = await response.text();
-    return parseSentimentHtml(html);
-  } catch (err) {
-    console.error('Failed to fetch sentiment data', err);
-    return {};
-  }
-}
-
-function parseSentimentHtml(html) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const table = doc.querySelector('table');
-  if (!table) return {};
-
-  const headers = Array.from(table.querySelectorAll('thead th')).map((th) =>
-    th.textContent.trim().toLowerCase()
-  );
-  const nameIdx = headers.findIndex((h) => h.includes('player') || h === 'name');
-  const sentimentIdx = headers.findIndex((h) => h.includes('sentiment'));
-
-  const map = {};
-  if (nameIdx === -1 || sentimentIdx === -1) return map;
-
-  table.querySelectorAll('tbody tr').forEach((tr) => {
-    const cells = tr.querySelectorAll('td');
-    if (cells.length > Math.max(nameIdx, sentimentIdx)) {
-      const name = cells[nameIdx].textContent.trim().toUpperCase();
-      const val = cells[sentimentIdx].textContent.trim();
-      map[name] = val;
-    }
-  });
-
-  return map;
-}
-
 function populateTable(rows, sentimentMap) {
   const table = document.getElementById('rankings-table');
   if (rows.length === 0) return;
 
+  const nameKey = Object.keys(rows[0]).find((k) => /player|name/i.test(k));
+
+  // Build table header
   const headerRow = document.createElement('tr');
-  const keys = Object.keys(rows[0]);
-  keys.forEach((key) => {
+  Object.keys(rows[0]).forEach((key) => {
     const th = document.createElement('th');
     th.textContent = key;
     headerRow.appendChild(th);
   });
-  const sentimentTh = document.createElement('th');
-  sentimentTh.textContent = 'Sentiment';
-  headerRow.appendChild(sentimentTh);
+  const thSentiment = document.createElement('th');
+  thSentiment.textContent = 'Sentiment';
+  headerRow.appendChild(thSentiment);
   table.querySelector('thead').appendChild(headerRow);
 
+  // Build rows
   const tbody = table.querySelector('tbody');
   rows.forEach((row) => {
     const tr = document.createElement('tr');
-    keys.forEach((key) => {
+    Object.values(row).forEach((val) => {
       const td = document.createElement('td');
-      td.textContent = row[key];
+      td.textContent = String(val).replace(/,/g, '');
       tr.appendChild(td);
     });
 
-    const sentimentTd = document.createElement('td');
-    const nameKey = keys.find((k) => k.toLowerCase().includes('player') || k.toLowerCase() === 'name');
-    const lookupName = nameKey ? row[nameKey].toUpperCase() : '';
-    sentimentTd.textContent = sentimentMap[lookupName] || '';
-    tr.appendChild(sentimentTd);
+    const tdSentiment = document.createElement('td');
+    const name = nameKey ? row[nameKey].toUpperCase() : '';
+    tdSentiment.textContent = name ? sentimentMap.get(name) || '' : '';
+    tr.appendChild(tdSentiment);
 
     tbody.appendChild(tr);
   });
 }
 
-fetchRankings();
+loadData();
