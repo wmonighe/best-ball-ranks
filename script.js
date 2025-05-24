@@ -18,7 +18,6 @@ async function fetchRankings() {
 }
 
 /**
- * Fetch sentiment data from taeks.com. Falls back to an empty map on error.
  * @returns {Promise<Map<string, string>>}
  */
 async function fetchSentiment() {
@@ -29,6 +28,7 @@ async function fetchSentiment() {
     const doc = parser.parseFromString(html, 'text/html');
     const table = doc.querySelector('table');
     const map = new Map();
+
     if (table) {
       const rows = table.querySelectorAll('tr');
       if (rows.length > 0) {
