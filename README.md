@@ -1,4 +1,5 @@
 
+
 # Best Ball Ranks
 
 This project displays wmonighe's Best Ball Eliminator rankings. Rankings are stored in a public Google Sheet and loaded via the `gviz` CSV export. The page also shows sentiment values scraped from taeks.com.
