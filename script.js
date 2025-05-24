@@ -3,6 +3,10 @@
 const csvUrl =
   'https://docs.google.com/spreadsheets/d/1rNouBdE-HbWafu-shO_5JLPSrLhr-xuGpXYfyOI-2oY/gviz/tq?tqx=out:csv&gid=148406078';
 
+/**
+ * Fetch rankings from the Google Sheet.
+ * @returns {Promise<Array<Object>>}
+ */
 async function fetchRankings() {
   const response = await fetch(csvUrl);
   const csvText = await response.text();
@@ -13,6 +17,10 @@ async function fetchRankings() {
   return results.data;
 }
 
+/**
+ * Fetch sentiment data from taeks.com.
+ * @returns {Promise<Map<string, string>>}
+ */
 async function fetchSentiment() {
   try {
     const resp = await fetch('https://taeks.com/nfl/bestball/leaderboard/rookie');
@@ -53,6 +61,9 @@ async function fetchSentiment() {
   }
 }
 
+/**
+ * Load rankings and sentiment information, then populate the table.
+ */
 async function loadData() {
   try {
     const [rows, sentimentMap] = await Promise.all([
@@ -96,7 +107,7 @@ function populateTable(rows, sentimentMap) {
     filteredHeaders.unshift(idHeader);
   }
 
-  // Ensure there is a sentiment column from scraped data
+  // Ensure there is a Sentiment column even if it wasn't in the sheet
   if (!filteredHeaders.some((h) => /sentiment/i.test(h))) {
     filteredHeaders.push('Sentiment');
   }
@@ -119,8 +130,6 @@ function populateTable(rows, sentimentMap) {
       if (/sentiment/i.test(key) && !row[key]) {
         const name = nameKey ? row[nameKey].toUpperCase() : '';
         td.textContent = name ? sentimentMap.get(name) || '' : '';
-      } else if (/sentiment/i.test(key)) {
-        td.textContent = String(row[key]).replace(/,/g, '');
       } else {
         td.textContent = String(row[key] || '').replace(/,/g, '');
       }
