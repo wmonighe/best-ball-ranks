@@ -1,5 +1,5 @@
 // Rankings are loaded from the public Google Sheet using the gviz CSV export.
-// The sheet must be published to the web for this request to succeed.
+// The sheet must be published to the web for this to succeed.
 const csvUrl =
   'https://docs.google.com/spreadsheets/d/1rNouBdE-HbWafu-shO_5JLPSrLhr-xuGpXYfyOI-2oY/gviz/tq?tqx=out:csv&gid=148406078';
 
@@ -84,50 +84,45 @@ function populateTable(rows, sentimentMap) {
 
   const allHeaders = Object.keys(rows[0]);
   const filteredHeaders = [];
-  let seenSentiment = false;
+  const nameKey = allHeaders.find((h) => /player|name/i.test(h));
+
+  // Filter headers: hide Notes/Contract columns and remove any Sentiment column from sheet
   allHeaders.forEach((h) => {
-    if (/notes/i.test(h) || /contract/i.test(h)) {
-      return; // skip hidden columns
-    }
-    if (/sentiment/i.test(h)) {
-      if (!seenSentiment) {
-        filteredHeaders.push(h);
-        seenSentiment = true;
-      }
-      return;
-    }
-    if (!filteredHeaders.includes(h)) {
-      filteredHeaders.push(h);
-    }
+    if (!h || h.trim() === '') return;
+    if (/notes/i.test(h) || /contract/i.test(h)) return;
+    if (/sentiment/i.test(h)) return;
+    if (!filteredHeaders.includes(h)) filteredHeaders.push(h);
   });
 
-  const idIndex = filteredHeaders.findIndex((h) => /^id$/i.test(h));
-  if (idIndex > 0) {
-    const [idHeader] = filteredHeaders.splice(idIndex, 1);
+  // Move ID column to far left
+  const idIdx = filteredHeaders.findIndex((h) => /^id$/i.test(h));
+  if (idIdx > 0) {
+    const [idHeader] = filteredHeaders.splice(idIdx, 1);
     filteredHeaders.unshift(idHeader);
   }
 
-  // Ensure there is a Sentiment column even if it wasn't in the sheet
-  if (!filteredHeaders.some((h) => /sentiment/i.test(h))) {
-    filteredHeaders.push('Sentiment');
-  }
+  // Add our Sentiment column
+  filteredHeaders.push('Sentiment');
 
-  const nameKey = allHeaders.find((k) => /player|name/i.test(k));
-
+  // Build table header
+  const thead = table.querySelector('thead');
+  thead.innerHTML = '';
   const headerRow = document.createElement('tr');
   filteredHeaders.forEach((key) => {
     const th = document.createElement('th');
     th.textContent = key;
     headerRow.appendChild(th);
   });
-  table.querySelector('thead').appendChild(headerRow);
+  thead.appendChild(headerRow);
 
+  // Build rows
   const tbody = table.querySelector('tbody');
+  tbody.innerHTML = '';
   rows.forEach((row) => {
     const tr = document.createElement('tr');
     filteredHeaders.forEach((key) => {
       const td = document.createElement('td');
-      if (/sentiment/i.test(key) && !row[key]) {
+      if (key === 'Sentiment') {
         const name = nameKey ? row[nameKey].toUpperCase() : '';
         td.textContent = name ? sentimentMap.get(name) || '' : '';
       } else {
