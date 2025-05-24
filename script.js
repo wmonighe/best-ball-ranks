@@ -19,7 +19,7 @@ async function fetchRankings() {
 
 /**
  * Fetch sentiment data from taeks.com.
- * @returns {Promise<Map<string,string>>}
+ * @returns {Promise<Map<string, string>>}
  */
 async function fetchSentiment() {
   try {
@@ -85,23 +85,26 @@ function populateTable(rows, sentimentMap) {
   const allHeaders = Object.keys(rows[0]);
   const filteredHeaders = [];
   const nameKey = allHeaders.find((h) => /player|name/i.test(h));
+
+  // Filter headers: hide Notes/Contract columns and remove any Sentiment column from sheet
   allHeaders.forEach((h) => {
-    if (!h || h.trim() === '') return; // skip blank header
-    if (/dead\s*cap/i.test(h)) return; // remove Dead Cap column
-    if (!filteredHeaders.includes(h)) {
-      filteredHeaders.push(h);
-    }
+    if (!h || h.trim() === '') return;
+    if (/notes/i.test(h) || /contract/i.test(h)) return;
+    if (/sentiment/i.test(h)) return;
+    if (!filteredHeaders.includes(h)) filteredHeaders.push(h);
   });
 
-  // Remove any existing Sentiment column from sheet
-  const sentimentIndex = filteredHeaders.findIndex((h) => /sentiment/i.test(h));
-  if (sentimentIndex !== -1) {
-    filteredHeaders.splice(sentimentIndex, 1);
+  // Move ID column to far left
+  const idIdx = filteredHeaders.findIndex((h) => /^id$/i.test(h));
+  if (idIdx > 0) {
+    const [idHeader] = filteredHeaders.splice(idIdx, 1);
+    filteredHeaders.unshift(idHeader);
   }
 
   // Add our Sentiment column
   filteredHeaders.push('Sentiment');
 
+  // Build table header
   const thead = table.querySelector('thead');
   thead.innerHTML = '';
   const headerRow = document.createElement('tr');
@@ -112,6 +115,7 @@ function populateTable(rows, sentimentMap) {
   });
   thead.appendChild(headerRow);
 
+  // Build rows
   const tbody = table.querySelector('tbody');
   tbody.innerHTML = '';
   rows.forEach((row) => {
