@@ -29,6 +29,7 @@ async function fetchSentiment() {
     const doc = parser.parseFromString(html, 'text/html');
     const table = doc.querySelector('table');
     const map = new Map();
+
     if (table) {
       const rows = table.querySelectorAll('tr');
       if (rows.length > 0) {
@@ -86,15 +87,22 @@ function populateTable(rows, sentimentMap) {
   const filteredHeaders = [];
   const nameKey = allHeaders.find((h) => /player|name/i.test(h));
 
-  // Filter headers: skip blank columns, Dead Cap, and any Sentiment column from sheet
+  // Filter headers: skip blank columns, Dead Cap, Notes, Contract, and any Sentiment column from the sheet
   allHeaders.forEach((h) => {
     if (!h || h.trim() === '') return;
-    if (/dead\s*cap/i.test(h)) return;
+    if (/dead\s*cap/i.test(h) || /notes/i.test(h) || /contract/i.test(h)) return;
     if (/sentiment/i.test(h)) return;
     if (!filteredHeaders.includes(h)) filteredHeaders.push(h);
   });
 
-  // Add our Sentiment column at the end
+  // Move ID column to the far left if present
+  const idIdx = filteredHeaders.findIndex((h) => /^id$/i.test(h));
+  if (idIdx > 0) {
+    const [idHeader] = filteredHeaders.splice(idIdx, 1);
+    filteredHeaders.unshift(idHeader);
+  }
+
+  // Add our Sentiment column
   filteredHeaders.push('Sentiment');
 
   // Build table header
