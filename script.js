@@ -18,6 +18,7 @@ async function fetchRankings() {
 }
 
 /**
+ * Fetch sentiment data from taeks.com.
  * @returns {Promise<Map<string, string>>}
  */
 async function fetchSentiment() {
